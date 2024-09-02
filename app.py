@@ -78,7 +78,7 @@ def create_url():
     with mysql.connection.cursor() as cursor:
         try:
             mysql.connection.autocommit(False)
-            cursor.execute("INSERT INTO url (url) VALUES (%s)", (url,))
+            cursor.execute("INSERT INTO `url` (`url`) VALUES (%s)", (url,))
             row_id = cursor.lastrowid
             if row_id is None:
                 cursor.connection.rollback()
@@ -107,9 +107,10 @@ def get_code_from_redis(code: str) -> str | None:
         return None
     return val.decode('utf-8')
 
+
 def get_code_from_db(code: str):
     with mysql.connection.cursor() as cursor:
-        cnt = cursor.execute('SELECT url FROM url WHERE code = %s LIMIT 1', (code,))
+        cnt = cursor.execute('SELECT `url` FROM `url` WHERE `code` = %s LIMIT 1', (code,))
         if cnt < 1:
             return None
         return cursor.fetchone()[0]
