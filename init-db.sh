@@ -13,19 +13,19 @@ mysql -h127.0.0.1 -uroot -pmy-secret 'USE huma' 2>/dev/null || \
 mysql -h127.0.0.1 -uroot -pmy-secret 2>/dev/null <<SQL
 SET NAMES utf8;
 
-CREATE DATABASE IF NOT EXISTS `huma`;
-USE `huma`;
+CREATE DATABASE IF NOT EXISTS huma;
+USE huma;
 
-CREATE TABLE IF NOT EXISTS `url` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `code` char(15) DEFAULT NULL,
-  `url` varchar(1024) NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `url_code_index` (`code`)
+CREATE TABLE IF NOT EXISTS url (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  code char(15) DEFAULT NULL,
+  url varchar(1024) NOT NULL,
+  PRIMARY KEY (id),
+  KEY url_code_index (code)
 ) ENGINE=InnoDB AUTO_INCREMENT=100000;
 
-SELECT `url`
-FROM `huma`.`url`
+SELECT url
+FROM huma.url
 ORDER BY id DESC
 LIMIT 50;
 
