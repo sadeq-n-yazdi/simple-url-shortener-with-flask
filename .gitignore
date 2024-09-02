@@ -1,1 +1,3 @@
-__pyc__/
+*.pyc
+__pycache__/
+.venv/
