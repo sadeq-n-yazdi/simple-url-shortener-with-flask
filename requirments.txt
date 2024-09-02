@@ -1,0 +1,4 @@
+Flask==3.0.3
+Flask-MySQLdb==2.0.0
+Flask-Caching==2.3.0
+redis-cache==0.1.5
