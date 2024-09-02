@@ -3,8 +3,8 @@ import string
 import sys
 
 from flask import Flask, request, send_from_directory, abort, redirect
-from flask_caching import Cache
 from flask_mysqldb import MySQL
+from redis import Redis
 
 app = Flask(__name__)
 
@@ -18,15 +18,9 @@ app.config['MYSQL_CONNECTION_OPTIONS'] = {
 }
 mysql = MySQL(app)
 
-app.config['CACHE_TYPE'] = 'RedisCache'
-app.config['CACHE_REDIS_HOST'] = '127.0.0.1'
-app.config['CACHE_REDIS_PORT'] = 6379
-app.config['CACHE_REDIS_DB'] = 0
-# app.config['CACHE_REDIS_URL'] = 'redis://localhost:6379/0'
-app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # Default cache timeout in seconds
-cache = Cache(app)
+redis = Redis(host='localhost', port=6379, db=0)
+# redis = Redis()
 
-# redis_client = Redis(host='localhost', port=6379, db=0)
 redis_cache_ttl = 3600
 
 app.run(host='0.0.0.0', port=8080, debug=True)
@@ -70,6 +64,7 @@ def log_error(message: str, **args):
 
 
 @app.get('/favicon.ico')
+# @cache.cached(timeout=3600, key_prefix="fav_icon_cache")
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico')
 
@@ -82,39 +77,57 @@ def create_url():
     # Try to save the New URL
     with mysql.connection.cursor() as cursor:
         try:
+            mysql.connection.autocommit(False)
             cursor.execute("INSERT INTO url (url) VALUES (%s)", (url,))
             row_id = cursor.lastrowid
+            if row_id is None:
+                cursor.connection.rollback()
+                return 'Server Error', 500
             code = convert_id_to_short_url(row_id)
-            cursor.execute("UPDATE url SET url = %s WHERE id = %s", (code, row_id))
-            cache.set(f"id:{code}", url, redis_cache_ttl)
-            return code, 200
+            affected_rows = cursor.execute("UPDATE `url` SET `code` = %(code)s WHERE `id` = %(id)s",
+                                           {"id": row_id, "code": code})
+            if affected_rows != 1:
+                cursor.connection.rollback()
+                return 'Server Error.', 500
+            cursor.connection.commit()
+            redis.setex(f"id:{code}", redis_cache_ttl, url)
+            return format_short_url(code), 200
         except Exception as e:
             log_error(f"Can not save {code}->{url}. error: {e}")
             return f"Error happened: {e}", 500
 
 
+def format_short_url(url) -> str:
+    return request.host_url + str(url)
+
+
+def get_code_from_redis(code: str) -> str | None:
+    val = redis.getex(f"id:{code}", redis_cache_ttl)
+    if val is None:
+        return None
+    return val.decode('utf-8')
+
 def get_code_from_db(code: str):
     with mysql.connection.cursor() as cursor:
-        cnt = cursor.execute('SELECT code FROM url WHERE code = %s LIMIT 1', (code,))
+        cnt = cursor.execute('SELECT url FROM url WHERE code = %s LIMIT 1', (code,))
         if cnt < 1:
             return None
         return cursor.fetchone()[0]
 
 
-@app.get("/<code>")
-@cache.cached(timeout=10, key_prefix="get", query_string=True)
+@app.route("/<code>", methods=['GET'])
 def redirect_to_url(code: str):
     # Try get it from the cache
-    url = cache.get(code)
-    if url:
+    url = get_code_from_redis(code)
+    if url is not None:
         return redirect(str(url), 302)
     # Try to get it from DB
     url = get_code_from_db(code)
     if not url:
         abort(404)
     # Cache the result
-    cache.set(f"id:{code}", url, redis_cache_ttl)
-    return redirect(url, 301)
+    redis.setex(f"id:{code}", redis_cache_ttl, url)
+    return redirect(format_short_url(url), 301)
 
 
 if __name__ == "__main__":
