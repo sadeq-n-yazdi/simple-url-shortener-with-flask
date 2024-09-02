@@ -29,7 +29,7 @@ FROM huma.url
 ORDER BY id DESC
 LIMIT 50;
 
--- GRANT ALL PRIVILEGES ON huma.* TO 'user'@'%';
+GRANT ALL PRIVILEGES ON huma.* TO 'user'@'%';
 -- ALTER USER 'user'@'%' IDENTIFIED BY 'secret-pw';
 
 SQL
